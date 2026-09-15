@@ -1,0 +1,67 @@
+---
+title: "Data processing"
+author: "Yefrid Cordoba"
+format: html
+---
+
+First import the table with weights and thickness
+
+```{r}
+#| message: False
+#| warning: False
+library(tidyverse)
+library(readxl)
+library(stringr)
+```
+
+Now we start with the data 
+
+```{r}
+fines_data <- read_xlsx("raw_data/Fines_study.xlsx", 
+                        sheet = "Handsheet_properties")
+```
+
+Extract the pulping data, and just select the kappa number
+
+Here i can select which columns are going to appear in my final table
+```{r}
+Pulping_data <- read_xlsx("raw_data/Fines_study.xlsx", 
+                        sheet = "Pulping") |>
+  select(Biomass, Code, Kappa, Total_screened_yield)
+```
+
+Here i can select which columns are going to appear in my final table
+```{r}
+freeness_data <- read_xlsx("raw_data/Fines_study.xlsx", 
+                        sheet = "Freeness") |>
+  select(ID1, freeness)
+```
+
+```{r}
+Pulping_data
+```
+
+
+We need to create the variables for each of the columns
+```{r}
+fines_data |>
+  mutate(biomass = as.factor(Biomass),
+         Biomass = NULL,
+         fines = factor(ifelse(
+           str_detect(ID,"F"), "Y", "N")),
+         hs_treatment = factor(
+           case_when(
+            str_detect(ID, "A") ~ "additive",
+            str_detect(ID, "5") ~ "recirculation",
+            str_detect(ID, "[1-4]") ~ "control"),
+           levels = c("control", "recirculation", "additive")),
+         Code = str_extract(ID, "^[WE]\\d"),
+         ID1 = str_extract(ID, "^[WE]\\d.")
+         ) |>
+  inner_join(Pulping_data, by = join_by(Code)) |>
+  left_join(freeness_data, by = join_by(ID1)) |>
+  select(-Biomass, -ID1) |>
+  relocate(Code, biomass, fines, hs_treatment, .after = ID)
+  
+```
+
