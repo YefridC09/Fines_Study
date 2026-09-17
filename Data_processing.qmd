@@ -13,6 +13,14 @@ library(tidyverse)
 library(readxl)
 library(stringr)
 library(janitor)
+library(units)
+library(emmeans)
+library(lmerTest)
+library(lme4)
+library(performance)
+library(see)
+library(DHARMa)
+library(pbkrtest)
 ```
 
 Now we start with the data 
@@ -52,7 +60,7 @@ tensile_data
 
 We need to create the variables for each of the columns
 ```{r}
-fines_data |>
+all_data <- fines_data |>
   mutate(biomass = as.factor(Biomass),
          Biomass = NULL,
          fines = factor(ifelse(
@@ -151,7 +159,7 @@ fqa_data <- read_excel("C:/Users/yacordob/OneDrive - North Carolina State Univer
 Now that all the data is in that table, we need to fix the data
 
 ```{r}
-fqa_data <- fqa_data|>
+fqa2_data <- fqa_data|>
   slice(-c(1:13, 19, 22, 23, 27, 29, 31)) |>
   drop_na(E1F1r) |>
   pivot_longer(-SampleId,
@@ -167,5 +175,206 @@ fqa_data <- fqa_data|>
     across(where(is.numeric), mean, na.rm = T
     
   ))
+```
+
+Setting units
+
+```{r}
+area <- set_units(0.02, "m^2")
+hyp_data <- all_data |>
+  select(c(1:7, 16, 19:23, 25:27)) |>
+  mutate(weight = set_units(weight, "g"),
+         thickness = set_units(thickness,"um"),
+         `F_[N]` = set_units(`F_[N]`, "N"),
+         # Total_yield = set_units(Total_yield*100, "%"),
+         # Total_screened_yield = set_units(Total_screened_yield*100, "%"),
+         `ModElas_[MPa]` = set_units(`ModElas_[MPa]`, "MPa")
+         ) |>
+  mutate(bw = weight*0.93 / area,
+         density = set_units(bw / thickness, "g/cm^3"),
+         T_index = set_units(`F_[N]`/ set_units(15, "mm") / bw, "kN*m/kg"),
+         Code = factor(Code)
+         ) |>
+  drop_units() |>
+  group_by(
+    Code,
+    biomass,
+    fines,
+    hs_treatment
+   ) #|>
+  # summarise(
+  #   T_index = mean(T_index, na.rm = TRUE),
+  #   n_sheets = n(),
+  #   .groups = "drop"
+  # )
+```
+
+Running for hypothesis test
+
+First we test whether fines affect tensile or not
+
+$H_o: \mu_{Fines} = \mu_{NoFines}$
+
+$H_a: \mu_{Fines} \neq \mu_{NoFines}$
+
+```{r}
+mod_full <- lmer(
+  T_index ~ biomass * fines * hs_treatment +
+    (1 | Code),
+  data = hyp_data
+)
+
+anova(mod_full, type = 3)
+```
+
+Based on the p-values, we reject the null hypothesis, and have strong evidence to conclude that the probability of getting this value under the assumption that the null hypothesis is true, is very low. Therefore we conclude that Fines do have an effect on the tensile index of the handsheets.
+
+Also, based on the p-value for the interaction between biomass:fines, we have strong evidence to conclude that there is an interaction between biomass and fines, so the effect differs between eucalyptus and wheat straw.
+
+Based on th p-value for the interaction between fines and the handsheet treatment, we fail to reject the null hypothesis, and conclude that the handsheet treatment does not change the effect of the fines (no direct correlation between the treatment and the fines type)
+
+And finally based on the interaction termen between biomass, fines, and treatment, we can conclude that the use of the cationic polymer, or the re circulation does not affect differently the wheat straw of the eucalyptus.
+
+```{r}
+hs_data <- hyp_data %>%
+  mutate(
+    Code = factor(Code),
+
+    biomass = factor(
+      biomass,
+      levels = c("E", "W"),
+      labels = c("Eucalyptus", "Wheat_straw")
+    ),
+
+    fines = factor(
+      fines,
+      levels = c("N", "Y"),
+      labels = c("No_fines", "Fines")
+    ),
+
+    hs_treatment = factor(
+      hs_treatment,
+      levels = c(
+        "control",
+        "recirculation",
+        "additive"
+      ),
+      labels = c(
+        "Control",
+        "Recirculation",
+        "Polymer"
+      )
+    )
+  )
+```
+
+```{r}
+sample_size_table <- hs_data %>%
+  group_by(
+    biomass,
+    Code,
+    fines,
+    hs_treatment
+  ) %>%
+  summarise(
+    n_measured = sum(!is.na(T_index)),
+    n_missing = sum(is.na(T_index)),
+    .groups = "drop"
+  )
+
+sample
+```
+
+```{r}
+cell_data <- hs_data %>%
+  group_by(
+    Code,
+    biomass,
+    fines,
+    hs_treatment
+  ) %>%
+  summarise(
+    n_handsheets = sum(!is.na(T_index)),
+
+    mean_T_index = if_else(
+      n_handsheets > 0,
+      mean(T_index, na.rm = TRUE),
+      NA_real_
+    ),
+
+    sd_T_index = if_else(
+      n_handsheets > 1,
+      sd(T_index, na.rm = TRUE),
+      NA_real_
+    ),
+
+    se_T_index = if_else(
+      n_handsheets > 1,
+      sd_T_index / sqrt(n_handsheets),
+      NA_real_
+    ),
+
+    .groups = "drop"
+  )
+```
+
+Descriptive statistics
+
+```{r}
+results_summary <- cell_data %>%
+  group_by(
+    biomass,
+    fines,
+    hs_treatment
+  ) %>%
+  summarise(
+    n_cooks = sum(!is.na(mean_T_index)),
+    mean = mean(mean_T_index, na.rm = TRUE),
+    sd_between_cooks = sd(mean_T_index, na.rm = TRUE),
+    se_between_cooks = sd_between_cooks / sqrt(n_cooks),
+    .groups = "drop"
+  )
+
+results_summary
+```
+
+Cook level responses
+```{r}
+ggplot(
+  cell_data,
+  aes(
+    x = fines,
+    y = mean_T_index,
+    color = biomass,
+    group = interaction(biomass, Code)
+  )
+) +
+  geom_line(alpha = 0.60) +
+  geom_point(size = 2.8) +
+  facet_wrap(~ hs_treatment) +
+  labs(
+    x = "Fines condition",
+    y = "Mean tensile index",
+    color = "Biomass"
+  ) +
+  theme_bw()
+```
+
+An upward line from No_fines to Fines means fines increased tensile index.
+
+A downward line means fines decreased tensile index.
+
+Different slopes for Eucalyptus and wheat straw suggest a biomass × fines interaction.
+
+Different slope patterns across the three panels suggest a three-way interaction.
+
+```{r}
+mod_cook <- lmer(
+  mean_T_index ~ biomass * fines * hs_treatment +
+    (1 | Code),
+  data = cell_data,
+  REML = TRUE,
+  na.action = na.exclude
+)
 ```
 
