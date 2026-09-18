@@ -150,8 +150,15 @@ fqa_data <- read_excel("C:/Users/yacordob/OneDrive - North Carolina State Univer
          range = "B8:B56")),
          (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W3N1.xlsm",
                        sheet = "FQAResult",
+         range = "B8:B56")),
+         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W2F1_reconstructed.xlsx",
+                       sheet = "FQAResult",
+         range = "B8:B56")),
+         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W3N2_reconstructed.xlsx",
+                       sheet = "FQAResult",
          range = "B8:B56"))
 )|>
+
   drop_na(SampleId)
 
 ```
@@ -188,12 +195,14 @@ hyp_data <- all_data |>
          `F_[N]` = set_units(`F_[N]`, "N"),
          # Total_yield = set_units(Total_yield*100, "%"),
          # Total_screened_yield = set_units(Total_screened_yield*100, "%"),
-         `ModElas_[MPa]` = set_units(`ModElas_[MPa]`, "MPa")
+         `ModElas_[MPa]` = set_units(`ModElas_[MPa]`, "MPa"),
+         tear_gf = set_units(tear_gf, "gf")
          ) |>
   mutate(bw = weight*0.93 / area,
          density = set_units(bw / thickness, "g/cm^3"),
          T_index = set_units(`F_[N]`/ set_units(15, "mm") / bw, "kN*m/kg"),
-         Code = factor(Code)
+         Code = factor(Code),
+         tear_N = set_units(tear_gf, "N")
          ) |>
   drop_units() |>
   group_by(
