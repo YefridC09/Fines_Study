@@ -88,78 +88,7 @@ all_data <- fines_data |>
 Now we get a code to extract the data from the FQA values
 
 ```{r}
-fqa_data <- read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E1F1.xlsm",
-                       sheet = "FQAResult",
-                       range = "A8:B56")|>
-  mutate((read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E1F2.xlsm",
-                       sheet = "FQAResult",
-                       range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E1N1.xlsm",
-                       sheet = "FQAResult",
-                       range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E1N2.xlsm",
-                       sheet = "FQAResult",
-                       range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E2F1.xlsm",
-                       sheet = "FQAResult",
-                       range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E2F2.xlsm",
-                       sheet = "FQAResult",
-                       range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E2N1.xlsm",
-                       sheet = "FQAResult",
-                       range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E2N2.xlsm",
-                       sheet = "FQAResult",
-                       range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E3F1.xlsm",
-                       sheet = "FQAResult",
-                       range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E3F2.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E3N2.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/E3N3.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W1F1.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W1F2.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W1N1.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W1N2.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W2N1.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W2N2.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W3F1.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W3F2.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W3N1.xlsm",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W2F1_reconstructed.xlsx",
-                       sheet = "FQAResult",
-         range = "B8:B56")),
-         (read_excel("C:/Users/yacordob/OneDrive - North Carolina State University/Fines Study Documents/FQA Documents/W3N2_reconstructed.xlsx",
-                       sheet = "FQAResult",
-         range = "B8:B56"))
-)|>
-
-  drop_na(SampleId)
+fqa_data <- readRDS("raw_data/fqa_data.rds")
 
 ```
 
@@ -189,7 +118,7 @@ Setting units
 ```{r}
 area <- set_units(0.02, "m^2")
 hyp_data <- all_data |>
-  select(c(1:7, 16, 19:23, 25:27)) |>
+  select(c(1:8, 16, 19:23, 25:27)) |>
   mutate(weight = set_units(weight, "g"),
          thickness = set_units(thickness,"um"),
          `F_[N]` = set_units(`F_[N]`, "N"),
