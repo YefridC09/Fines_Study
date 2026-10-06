@@ -113,39 +113,67 @@ fqa2_data <- fqa_data|>
   ))
 ```
 
-Setting units
+Setting units, in this code also main calculations of new variables is performed, and the numbers are later strip from their variables so they are compatibles with statistical analysis functions.
 
 ```{r}
-area <- set_units(0.02, "m^2")
+area_m2 <- set_units(0.02, "m^2")
 hyp_data <- all_data |>
   select(c(1:8, 16, 19:23, 25:27)) |>
-  mutate(weight = set_units(weight, "g"),
-         thickness = set_units(thickness,"um"),
-         `F_[N]` = set_units(`F_[N]`, "N"),
+  mutate(weight_g = set_units(weight, "g"),
+         thickness_um = set_units(thickness,"um"),
+         force_N = set_units(`F_[N]`, "N"),
          # Total_yield = set_units(Total_yield*100, "%"),
          # Total_screened_yield = set_units(Total_screened_yield*100, "%"),
-         `ModElas_[MPa]` = set_units(`ModElas_[MPa]`, "MPa"),
+         ModElas_MPa = set_units(`ModElas_[MPa]`, "MPa"),
          tear_gf = set_units(tear_gf, "gf")
          ) |>
-  mutate(bw = weight*0.93 / area,
-         density = set_units(bw / thickness, "g/cm^3"),
-         T_index = set_units(`F_[N]`/ set_units(15, "mm") / bw, "kN*m/kg"),
+  mutate(bw_g_m2 = weight_g * 0.93 / area_m2,
+         density_g_cm3 = set_units(bw_g_m2 / thickness_um, "g/cm^3"),
+         T_index_kNm_kg = set_units(force_N/ set_units(15, "mm") / bw_g_m2,
+                                    "kN*m/kg"),
          Code = factor(Code),
-         tear_N = set_units(tear_gf, "N")
+         tear_N = set_units(tear_gf, "N"),
+         tear_index_m2N_kg = set_units (tear_N / bw_g_m2, "m^2*N/kg")
          ) |>
   drop_units() |>
-  group_by(
-    Code,
-    biomass,
-    fines,
-    hs_treatment
-   ) #|>
+  select(-c("F_[N]", "tFmax [s]", "ModElas_[MPa]",
+            "weight", "thickness", "TEA_[J/m²]"))
+  #|>
+  # group_by(
+  #   Code,
+  #   biomass,
+  #   fines,
+  #   hs_treatment
+  # ) #|>
   # summarise(
   #   T_index = mean(T_index, na.rm = TRUE),
   #   n_sheets = n(),
   #   .groups = "drop"
   # )
 ```
+
+```{r}
+
+library(ggplot2)
+
+ggplot(hyp_data |> filter(hs_treatment == "additive"),
+       aes(x = density_g_cm3,
+           y = T_index_kNm_kg,
+           color = biomass
+           )) +
+  geom_point() +
+  geom_smooth(method = "lm",
+              se = FALSE) +
+  labs(
+    x = "Density g/cm^3",
+    y = "T Index",
+    color = "Treatment"
+  ) +
+  theme_minimal()
+
+
+```
+
 
 Running for hypothesis test
 
@@ -157,7 +185,7 @@ $H_a: \mu_{Fines} \neq \mu_{NoFines}$
 
 ```{r}
 mod_full <- lmer(
-  T_index ~ biomass * fines * hs_treatment +
+  T_index_kNm_kg ~ biomass * fines * hs_treatment +
     (1 | Code),
   data = hyp_data
 )
@@ -167,11 +195,11 @@ anova(mod_full, type = 3)
 
 Based on the p-values, we reject the null hypothesis, and have strong evidence to conclude that the probability of getting this value under the assumption that the null hypothesis is true, is very low. Therefore we conclude that Fines do have an effect on the tensile index of the handsheets.
 
-Also, based on the p-value for the interaction between biomass:fines, we have strong evidence to conclude that there is an interaction between biomass and fines, so the effect differs between eucalyptus and wheat straw.
+Also, based on the p-value for the interaction between biomass:fines, we have strong evidence to conclude that there is an interaction between biomass and fines, so the effect of fines differs between eucalyptus and wheat straw.
 
 Based on th p-value for the interaction between fines and the handsheet treatment, we fail to reject the null hypothesis, and conclude that the handsheet treatment does not change the effect of the fines (no direct correlation between the treatment and the fines type)
 
-And finally based on the interaction termen between biomass, fines, and treatment, we can conclude that the use of the cationic polymer, or the re circulation does not affect differently the wheat straw of the eucalyptus.
+And finally based on the interaction term between biomass, fines, and treatment, we can conclude that the use of the cationic polymer, or the re circulation does not affect differently the wheat straw of the eucalyptus.
 
 ```{r}
 hs_data <- hyp_data %>%
@@ -207,20 +235,20 @@ hs_data <- hyp_data %>%
 ```
 
 ```{r}
-sample_size_table <- hs_data %>%
+sample_size_table <- hs_data |>
   group_by(
     biomass,
     Code,
     fines,
     hs_treatment
-  ) %>%
+  ) |>
   summarise(
-    n_measured = sum(!is.na(T_index)),
-    n_missing = sum(is.na(T_index)),
+    n_measured = sum(!is.na(T_index_kNm_kg)),
+    n_missing = sum(is.na(T_index_kNm_kg)),
     .groups = "drop"
   )
 
-sample
+sample_size_table
 ```
 
 ```{r}
@@ -232,17 +260,17 @@ cell_data <- hs_data %>%
     hs_treatment
   ) %>%
   summarise(
-    n_handsheets = sum(!is.na(T_index)),
+    n_handsheets = sum(!is.na(T_index_kNm_kg)),
 
     mean_T_index = if_else(
       n_handsheets > 0,
-      mean(T_index, na.rm = TRUE),
+      mean(T_index_kNm_kg, na.rm = TRUE),
       NA_real_
     ),
 
     sd_T_index = if_else(
       n_handsheets > 1,
-      sd(T_index, na.rm = TRUE),
+      sd(T_index_kNm_kg, na.rm = TRUE),
       NA_real_
     ),
 
@@ -254,6 +282,24 @@ cell_data <- hs_data %>%
 
     .groups = "drop"
   )
+```
+
+
+```{r}
+library(ggplot2)
+
+ggplot(cell_data,
+       aes(x = biomass,
+           y = mean_T_index,
+           fill = hs_treatment)) +
+  geom_violin() +
+  labs(
+    x = "Biomass",
+    y = "T Index",
+    fill = "Treatment"
+  ) +
+  theme_minimal()
+
 ```
 
 Descriptive statistics
