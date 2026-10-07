@@ -4,7 +4,7 @@ author: "Yefrid Cordoba"
 format: html
 ---
 
-First import the table with weights and thickness
+## Libraries
 
 ```{r}
 #| message: False
@@ -21,16 +21,26 @@ library(performance)
 library(see)
 library(DHARMa)
 library(pbkrtest)
+library(ggpmisc)
 ```
 
+## Importing data
+
+
+### 1. Handsheet data
+
 Now we start with the data 
+
+This first code chunk will import the data of the handsheets that was measured in the lab like weight, caliper, and tear.
 
 ```{r}
 fines_data <- read_xlsx("raw_data/Fines_study.xlsx", 
                         sheet = "Handsheet_properties")
 ```
 
-Extract the pulping data, and just select the kappa number
+### 2. Pulping data
+
+Import the pulping data like temperature, time, chemical charge, pulping, and screening yield, and kappa.
 
 Here i can select which columns are going to appear in my final table
 ```{r}
@@ -39,25 +49,44 @@ Pulping_data <- read_xlsx("raw_data/Fines_study.xlsx",
   # select(Biomass, Code, Kappa, Total_screened_yield, )
 ```
 
-Here i can select which columns are going to appear in my final table
+### 3. Freeness data
+
+This code is importing the freeness data and selecting just the final values and an ID to later related to other tables.
 ```{r}
 freeness_data <- read_xlsx("raw_data/Fines_study.xlsx", 
                         sheet = "Freeness") |>
   select(ID1, freeness)
 ```
 
-```{r}
-Pulping_data
-```
+### 4. Tensile data
+
+In this code chunk we are going to import the data from the tensile test.
 
 Getting the data from the tensile tests
 
 ```{r}
 tensile_data <- read_xlsx("raw_data/tensile_data.xlsx")
-tensile_data
+
 ```
 
+### 5. FQA data
 
+We are going to call the file where previously imported data is stored, this is done in this way, since the amount of excel files that needs to be read each time is big, and create computation constrains. In case the data does not exist, execute the file `fqa_data_extraction.R`
+
+After the `.rds` file has been created, we are going to bring it to our environment as a new object.
+
+```{r}
+fqa_data <- readRDS("raw_data/fqa_data.rds")
+
+```
+
+## Wrangling data
+
+All the previously imported have different variables, columns, spaces, missing values, etc, which need to be fixed below.
+
+### 1. Master table
+
+Creating a master table with all the data that is going to be used later
 We need to create the variables for each of the columns
 ```{r}
 all_data <- fines_data |>
@@ -85,12 +114,7 @@ all_data <- fines_data |>
   
 ```
 
-Now we get a code to extract the data from the FQA values
-
-```{r}
-fqa_data <- readRDS("raw_data/fqa_data.rds")
-
-```
+###2. FQA wrangling
 
 Now that all the data is in that table, we need to fix the data
 
@@ -113,7 +137,11 @@ fqa2_data <- fqa_data|>
   ))
 ```
 
-Setting units, in this code also main calculations of new variables is performed, and the numbers are later strip from their variables so they are compatibles with statistical analysis functions.
+
+
+### 3. Hypothesis test data
+
+Here we are setting units, in this code also main calculations of new variables is performed, and the numbers are later strip from their units so they are compatibles with statistical analysis functions.
 
 ```{r}
 area_m2 <- set_units(0.02, "m^2")
@@ -152,18 +180,35 @@ hyp_data <- all_data |>
   # )
 ```
 
+## Exploratory Data Analysis
+
+In this section we are going to perform basic exploratory data analysis before starting with the hypothesis test.
+
+We are going to check distributions, with boxplots, bars charts, and check normality.
+
+### 1. Checking normality
+
+
+
 ```{r}
 
 library(ggplot2)
 
-ggplot(hyp_data |> filter(hs_treatment == "additive"),
+ggplot(hyp_data, # |> filter(hs_treatment == "control"),
        aes(x = density_g_cm3,
-           y = T_index_kNm_kg,
-           color = biomass
+           y = tear_index_m2N_kg,
+           color = hs_treatment
            )) +
   geom_point() +
   geom_smooth(method = "lm",
               se = FALSE) +
+  stat_poly_eq(
+aes(
+label = paste(..rr.label..)
+),
+formula = y ~ x,
+parse = TRUE
+) +
   labs(
     x = "Density g/cm^3",
     y = "T Index",
