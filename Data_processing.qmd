@@ -195,31 +195,307 @@ We are going to check distributions, with boxplots, bars charts, and check norma
 library(ggplot2)
 
 ggplot(hyp_data, # |> filter(hs_treatment == "control"),
-       aes(x = density_g_cm3,
-           y = tear_index_m2N_kg,
-           color = hs_treatment
+       aes(y = density_g_cm3,
+          # y = tear_index_m2N_kg,
+           x = hs_treatment,
+          #colour = biomass,
+          fill = biomass, 
+          alpha = 0.5
            )) +
-  geom_point() +
-  geom_smooth(method = "lm",
-              se = FALSE) +
-  stat_poly_eq(
-aes(
-label = paste(..rr.label..)
-),
-formula = y ~ x,
-parse = TRUE
-) +
-  labs(
-    x = "Density g/cm^3",
-    y = "T Index",
-    color = "Treatment"
-  ) +
+ # geom_point() +
+  geom_boxplot()+
+#  geom_jitter() +
+#  geom_smooth(method = "lm",
+ #             se = FALSE) +
+#   stat_poly_eq(
+# aes(
+# label = paste(..rr.label..)
+# ),
+# formula = y ~ x,
+# parse = TRUE
+# ) +
+ #  labs(
+ #    x = "Density g/cm^3",
+ #    y = "T Index",
+ #    color = "Treatment"
+ # ) +
   theme_minimal()
 
 
 ```
 
+#### Q-Q plots
 
+1. Density distributions
+
+```{r}
+ggplot(hyp_data, aes(sample = density_g_cm3)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  theme_minimal() +
+  labs(
+    title = "Q-Q Plot of Density",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  )
+```
+```{r}
+library(rstatix)
+hyp_data |> 
+  dplyr::filter(biomass == "W",
+                fines == "Y") |>
+  dplyr::group_by(hs_treatment) |>
+ # pull(tear_index_m2N_kg) |>
+  summarise(p_value = shapiro.test(tear_index_m2N_kg)$p.value,
+            sample_size = n())
+
+```
+
+
+
+2. 
+
+```{r}
+ggplot(hyp_data |> filter(hs_treatment == "recirculation",
+                          biomass == "W",
+                          fines == "Y"), 
+       aes(sample = tear_index_m2N_kg)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  theme_minimal() +
+  labs(
+    title = "Q-Q Plot of Tear index",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  )
+#if i omit the `plot = my_plot` it will save the last plot printed
+#ggsave("QQ_tear_index.jpg", width = 8, height = 6, dpi = 300)
+```
+
+3. 
+
+```{r}
+ggplot(hyp_data |> filter(hs_treatment == "additive", 
+                          biomass == "W"), 
+       aes(sample = T_index_kNm_kg)
+       ) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  theme_minimal() +
+  labs(
+    title = "Q-Q Plot of Tensile index",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  )
+
+```
+
+
+```{r}
+mod <- lm(T_index_kNm_kg ~ hs_treatment, data = hyp_data)
+
+ggplot(data.frame(res = residuals(mod)),
+       aes(sample = res)) +
+  stat_qq() +
+  stat_qq_line()
+```
+
+### 2. Checking interaction plot
+
+We create the table a summary table with the summary of values for each independent replicate and the correspondent treatment
+```{r}
+#| echo : FALSE
+#| 
+cell_data <- hyp_data |>
+  group_by(
+    Code,
+    biomass,
+    fines,
+    hs_treatment
+  ) |>
+  summarise(
+    n_handsheets = sum(!is.na(T_index_kNm_kg)),
+
+    # mean_T_index = if_else(
+    #   n_handsheets > 0,
+    #   mean(T_index_kNm_kg, na.rm = TRUE),
+    #   NA_real_
+    # ),
+    # 
+    # sd_T_index = if_else(
+    #   n_handsheets > 1,
+    #   sd(T_index_kNm_kg, na.rm = TRUE),
+    #   NA_real_
+    # ),
+    # 
+    # se_T_index = if_else(
+    #   n_handsheets > 1,
+    #   sd_T_index / sqrt(n_handsheets),
+    #   NA_real_
+    # ),
+    across(where(is.numeric),
+           list("mean" = ~ mean(.x, na.rm = T)),
+           .names = "{.fn}_{.col}"),
+
+    .groups = "drop"
+  )
+cell_data
+```
+
+Then we need to create a tibble with the mean variable, the standard deviation and the standard error for each of the biomass x fines x treatment combination.
+```{r}
+T_index_data <- cell_data |>
+    group_by(
+        biomass,
+        fines,
+        hs_treatment
+    ) |>
+    summarise(
+        n_cooks = sum(!is.na(mean_T_index_kNm_kg)),
+        mean_T_index1 = mean(mean_T_index_kNm_kg, na.rm = TRUE),
+        sd_between_cooks = sd(mean_T_index_kNm_kg, na.rm = TRUE),
+        .groups = "drop"
+    )
+T_index_data
+```
+
+
+```{r}
+# descriptive_results <- cell_data |>
+#      group_by(
+#          biomass,
+#          fines,
+#          hs_treatment
+#      ) |>
+#      summarise(
+#          n_cooks = sum(!is.na(mean_T_index)),
+#          mean_T_index1 = mean(mean_T_index, na.rm = TRUE),
+#          sd_between_cooks = sd(mean_T_index, na.rm = TRUE),
+#          se_between_cooks =
+#              sd_between_cooks / sqrt(n_cooks),
+#          minimum_cook_mean =
+#              min(mean_T_index, na.rm = TRUE),
+#          maximum_cook_mean =
+#              max(mean_T_index, na.rm = TRUE),
+#          .groups = "drop"
+#      )
+```
+
+```{r}
+#| echo: FALSE
+#| 
+ggplot(
+    cell_data,
+    aes(
+        x = fines,
+        y = mean_T_index_kNm_kg,
+        color = biomass,
+        group = interaction(biomass, Code)
+    )
+) +
+    geom_line(
+        alpha = 0.7
+    ) +
+    geom_point(
+        size = 2.8
+    ) +
+    facet_wrap(
+        ~ hs_treatment
+    ) +
+    labs(
+        x = "Fines condition",
+        y = "Mean tensile index",
+        color = "Biomass"
+    ) +
+    theme_bw()
+```
+
+```{r}
+#| echo: FALSE
+ggplot(
+    cell_data,
+    aes(
+        x = fines,
+        y = mean_tear_index_m2N_kg,
+        color = biomass,
+        group = interaction(biomass, Code)
+    )
+) +
+    geom_line(
+        alpha = 0.65
+    ) +
+    geom_point(
+        size = 2.8
+    ) +
+    facet_wrap(
+        ~ hs_treatment
+    ) +
+    labs(
+        x = "Fines condition",
+        y = "Mean tear index",
+        color = "Biomass"
+    ) +
+    theme_bw()
+```
+
+```{r}
+#| echo: FALSE
+ggplot(
+    cell_data,
+    aes(
+        x = fines,
+        y = mean_density_g_cm3,
+        color = biomass,
+        group = interaction(biomass, Code)
+    )
+) +
+    geom_line(
+        alpha = 0.65
+    ) +
+    geom_point(
+        size = 2.8
+    ) +
+    facet_wrap(
+        ~ hs_treatment
+    ) +
+    labs(
+        x = "Fines condition",
+        y = "Mean density index",
+        color = "Biomass"
+    ) +
+    theme_bw()
+```
+
+```{r}
+#| echo: FALSE
+ggplot(
+    cell_data,
+    aes(
+        x = mean_density_g_cm3,
+        y = mean_T_index_kNm_kg,
+        color = biomass,
+        fill = hs_treatment
+    )
+) +
+    # geom_line(
+    #     alpha = 0.65
+    # ) +
+    geom_point(
+        size = 2.8
+    ) +
+    # facet_wrap(
+    #     ~ hs_treatment
+    # ) +
+  geom_smooth(method = "lm",
+              se = FALSE) +
+    labs(
+        x = "Fines condition",
+        y = "Mean density index",
+        color = "Biomass"
+    ) +
+    theme_bw()
+#ggsave("interaction.jpg", width = 10, height = 10, units = "cm")
+```
 Running for hypothesis test
 
 First we test whether fines affect tensile or not
@@ -242,7 +518,7 @@ Based on the p-values, we reject the null hypothesis, and have strong evidence t
 
 Also, based on the p-value for the interaction between biomass:fines, we have strong evidence to conclude that there is an interaction between biomass and fines, so the effect of fines differs between eucalyptus and wheat straw.
 
-Based on th p-value for the interaction between fines and the handsheet treatment, we fail to reject the null hypothesis, and conclude that the handsheet treatment does not change the effect of the fines (no direct correlation between the treatment and the fines type)
+Based on the p-value for the interaction between fines and the handsheet treatment, we fail to reject the null hypothesis, and conclude that the handsheet treatment does not change the effect of the fines (no direct correlation between the treatment and the fines type)
 
 And finally based on the interaction term between biomass, fines, and treatment, we can conclude that the use of the cationic polymer, or the re circulation does not affect differently the wheat straw of the eucalyptus.
 
