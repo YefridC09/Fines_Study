@@ -157,6 +157,8 @@ hyp_data <- all_data |>
          ) |>
   mutate(bw_g_m2 = weight_g * 0.93 / area_m2,
          density_g_cm3 = set_units(bw_g_m2 / thickness_um, "g/cm^3"),
+         T_strength_kN_m = set_units(force_N/ set_units(15, "mm"),
+                                    "kN/m"),
          T_index_kNm_kg = set_units(force_N/ set_units(15, "mm") / bw_g_m2,
                                     "kN*m/kg"),
          Code = factor(Code),
@@ -409,6 +411,35 @@ ggplot(
     ) +
     theme_bw()
 ```
+```{r}
+#| echo: FALSE
+#| 
+ggplot(
+    cell_data,
+    aes(
+        x = fines,
+        y = mean_T_strength_kN_m,
+        color = biomass,
+        group = interaction(biomass, Code)
+    )
+) +
+    geom_line(
+        alpha = 0.7
+    ) +
+    geom_point(
+        size = 2.8
+    ) +
+    facet_wrap(
+        ~ hs_treatment
+    ) +
+    labs(
+        x = "Fines condition",
+        y = "Mean tensile strength",
+        color = "Biomass"
+    ) +
+    theme_bw()
+```
+
 
 ```{r}
 #| echo: FALSE
@@ -573,36 +604,36 @@ sample_size_table
 ```
 
 ```{r}
-cell_data <- hs_data %>%
-  group_by(
-    Code,
-    biomass,
-    fines,
-    hs_treatment
-  ) %>%
-  summarise(
-    n_handsheets = sum(!is.na(T_index_kNm_kg)),
-
-    mean_T_index = if_else(
-      n_handsheets > 0,
-      mean(T_index_kNm_kg, na.rm = TRUE),
-      NA_real_
-    ),
-
-    sd_T_index = if_else(
-      n_handsheets > 1,
-      sd(T_index_kNm_kg, na.rm = TRUE),
-      NA_real_
-    ),
-
-    se_T_index = if_else(
-      n_handsheets > 1,
-      sd_T_index / sqrt(n_handsheets),
-      NA_real_
-    ),
-
-    .groups = "drop"
-  )
+# cell_data <- hs_data %>%
+#   group_by(
+#     Code,
+#     biomass,
+#     fines,
+#     hs_treatment
+#   ) %>%
+#   summarise(
+#     n_handsheets = sum(!is.na(T_index_kNm_kg)),
+# 
+#     mean_T_index = if_else(
+#       n_handsheets > 0,
+#       mean(T_index_kNm_kg, na.rm = TRUE),
+#       NA_real_
+#     ),
+# 
+#     sd_T_index = if_else(
+#       n_handsheets > 1,
+#       sd(T_index_kNm_kg, na.rm = TRUE),
+#       NA_real_
+#     ),
+# 
+#     se_T_index = if_else(
+#       n_handsheets > 1,
+#       sd_T_index / sqrt(n_handsheets),
+#       NA_real_
+#     ),
+# 
+#     .groups = "drop"
+#   )
 ```
 
 
